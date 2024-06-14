@@ -75,12 +75,17 @@ async function getResponse(req: NextRequest): Promise<NextResponse> {
     });
 
     const queryData = await queryResponse.json();
+    console.log('Dune Query Response:', queryData);
+
     const executionId = queryData.execution_id;
 
     if (!executionId) {
       console.error('Failed to execute query');
       return new NextResponse('Failed to execute query', { status: 500 });
     }
+
+    console.log('Execution ID:', executionId);
+    console.log('Query State:', queryData.state);
 
     // Return a response with a refresh button
     return new NextResponse(
