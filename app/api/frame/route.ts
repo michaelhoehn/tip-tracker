@@ -12,14 +12,16 @@ if (!neynarApiKey) {
   throw new Error('NEXT_PUBLIC_NEYNAR_API_KEY is not defined in environment variables');
 }
 
-async function getResponse(req: NextRequest): Promise<NextResponse> {
-  const body: FrameRequest = await req.json();
-
+async function getResponse(body: FrameRequest): Promise<NextResponse> {
   try {
+    console.log('Received body:', body);
+
     const { isValid, message } = await getFrameMessage(body, {
       neynarApiKey,
       allowFramegear: true, // true to allow debugging in framegear
     });
+
+    console.log('Frame message validation:', isValid, message);
 
     if (!isValid) {
       console.error('Message not valid');
@@ -27,7 +29,7 @@ async function getResponse(req: NextRequest): Promise<NextResponse> {
     }
 
     // const fid = message.interactor.fid;
-    const fid = 253746;
+    const fid = 253746; // Hardcoded for debugging
     console.log('FID:', fid);
 
     // Step 2: Get the username from Neynar API
@@ -39,6 +41,8 @@ async function getResponse(req: NextRequest): Promise<NextResponse> {
       method: 'GET',
       headers: userHeaders,
     });
+
+    console.log('Neynar API response status:', userResponse.status);
 
     if (!userResponse.ok) {
       console.error(`Neynar API request failed with status: ${userResponse.status}`);
@@ -74,31 +78,31 @@ async function getResponse(req: NextRequest): Promise<NextResponse> {
       }),
     });
 
+    console.log('Dune query response status:', queryResponse.status);
+
     const queryData = await queryResponse.json();
-    console.log('Dune Query Response:', queryData);
+    console.log('Dune Query Data:', queryData);
 
-    const executionId = queryData.execution_id;
+    const userExecutionID = queryData.execution_id;
+    console.log('User Execution ID:', userExecutionID);
 
-    if (!executionId) {
+    if (!userExecutionID) {
       console.error('Failed to execute query');
       return new NextResponse('Failed to execute query', { status: 500 });
     }
 
-    console.log('Execution ID:', executionId);
-    console.log('Query State:', queryData.state);
-
-    // Return a response with a refresh button
+    // Move to the final state with updated image and button
     return new NextResponse(
       getFrameHtmlResponse({
         buttons: [
           {
             action: 'link',
-            label: 'Refresh',
-            target: `${NEXT_PUBLIC_URL}/api/frame/refresh?execution_id=${executionId}`,
+            label: 'Tip cmplx',
+            target: 'https://warpcast.com/cmplx.eth',
           },
         ],
         image: {
-          src: `${NEXT_PUBLIC_URL}/loading.png`,
+          src: `${NEXT_PUBLIC_URL}/park-1.png`,
           aspectRatio: '1:1',
         },
         postUrl: `${NEXT_PUBLIC_URL}/api/frame`,
@@ -110,8 +114,18 @@ async function getResponse(req: NextRequest): Promise<NextResponse> {
   }
 }
 
+// Handling POST request to initiate the process
 export async function POST(req: NextRequest): Promise<Response> {
-  return getResponse(req);
+  try {
+    console.log('POST request received');
+    const body = await req.json();
+    console.log('POST request body:', body);
+
+    return getResponse(body); // Directly handle the initial request and move to the final state
+  } catch (error) {
+    console.error('Error in POST request:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
 }
 
 export const dynamic = 'force-dynamic';
