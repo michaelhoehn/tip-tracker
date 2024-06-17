@@ -14,25 +14,17 @@ if (!neynarApiKey) {
 
 async function handleInitialRequest(body: any): Promise<NextResponse> {
   try {
-    console.log('Received body:', body);
-
     const { isValid, message } = await getFrameMessage(body, {
       neynarApiKey,
-      allowFramegear: true, // true to allow debugging in framegear
+      // allowFramegear: true,
     });
 
-    console.log('Frame message validation:', isValid, message);
-
     if (!isValid) {
-      console.error('Message not valid');
       return new NextResponse('Message not valid', { status: 500 });
     }
 
+    // const fid = 253746;
     const fid = message.interactor.fid;
-    // const fid = 253746; // Hardcoded for debugging
-    console.log('FID:', fid);
-
-    // Step 2: Get the username from Neynar API
     const userHeaders: HeadersInit = new Headers();
     userHeaders.set('accept', 'application/json');
     userHeaders.set('api_key', neynarApiKey);
@@ -42,27 +34,19 @@ async function handleInitialRequest(body: any): Promise<NextResponse> {
       headers: userHeaders,
     });
 
-    console.log('Neynar API response status:', userResponse.status);
-
     if (!userResponse.ok) {
-      console.error(`Neynar API request failed with status: ${userResponse.status}`);
       return new NextResponse(`Neynar API request failed with status: ${userResponse.status}`, {
         status: userResponse.status,
       });
     }
 
     const userData = await userResponse.json();
-    console.log('User Data:', userData);
-
     const username = userData?.users?.[0]?.username;
-    console.log('Username:', username);
 
     if (!username) {
-      console.error('Username not found');
       return new NextResponse('Username not found', { status: 500 });
     }
 
-    // Step 3: Execute Dune query with username
     const duneHeaders: HeadersInit = new Headers();
     duneHeaders.set('X-Dune-API-Key', duneApiKey);
 
@@ -74,18 +58,13 @@ async function handleInitialRequest(body: any): Promise<NextResponse> {
       },
     );
 
-    console.log('Dune query response status:', queryResponse.status);
-
     const resultsData = await queryResponse.json();
-    console.log('Dune Query Results:', resultsData);
-
-    // Extracting 'Total Tip Amount' value from the Dune API response
     const totalTips = resultsData.result?.rows?.[0]?.['Total Tip Amount'] || 0;
-    console.log('Total Tips:', totalTips);
 
     const dynamicImageUrl = `${NEXT_PUBLIC_URL}/api/frame/generate-image?username=${username}&totalTips=${totalTips}`;
 
-    // Move to the results page
+    console.log(`Dynamic Image URL: ${dynamicImageUrl}`);
+
     return new NextResponse(
       getFrameHtmlResponse({
         buttons: [
@@ -100,23 +79,19 @@ async function handleInitialRequest(body: any): Promise<NextResponse> {
           aspectRatio: '1:1',
         },
         postUrl: `${NEXT_PUBLIC_URL}/api/frame`,
-        state: { totalTips, username }, // Pass the total tips and username to the same page
+        state: { totalTips, username },
       }),
     );
   } catch (error) {
-    console.error('Error processing request:', error);
+    console.error('Error processing initial request:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
-// Handling POST request to initiate the process
 export async function POST(req: NextRequest): Promise<Response> {
   try {
-    console.log('POST request received');
     const body = await req.json();
-    console.log('POST request body:', body);
-
-    return handleInitialRequest(body); // Handle the initial request
+    return handleInitialRequest(body);
   } catch (error) {
     console.error('Error in POST request:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
