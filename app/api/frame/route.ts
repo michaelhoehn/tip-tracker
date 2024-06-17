@@ -18,7 +18,7 @@ async function handleInitialRequest(body: any): Promise<NextResponse> {
 
     const { isValid, message } = await getFrameMessage(body, {
       neynarApiKey,
-      // allowFramegear: true, // true to allow debugging in framegear
+      allowFramegear: true, // true to allow debugging in framegear
     });
 
     console.log('Frame message validation:', isValid, message);
@@ -28,8 +28,8 @@ async function handleInitialRequest(body: any): Promise<NextResponse> {
       return new NextResponse('Message not valid', { status: 500 });
     }
 
-    // const fid = 253746; // Hardcoded for debugging
     const fid = message.interactor.fid;
+    // const fid = 253746; // Hardcoded for debugging
     console.log('FID:', fid);
 
     // Step 2: Get the username from Neynar API
@@ -83,41 +83,7 @@ async function handleInitialRequest(body: any): Promise<NextResponse> {
     const totalTips = resultsData.result?.rows?.[0]?.['Total Tip Amount'] || 0;
     console.log('Total Tips:', totalTips);
 
-    // Generate dynamic HTML and CSS for the results
-    const htmlContent = `
-      <div class="results-container">
-        <div class="username">@${username}</div>
-        <div class="total-tips">${totalTips} $degen</div>
-        <div class="footer">Your Daily Tips<br>frame by @cmplx.eth</div>
-      </div>
-    `;
-    const cssContent = `
-      .results-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        background-color: #0b0c10;
-        color: #66ff66;
-        font-family: 'Menlo', monospace;
-      }
-      .username {
-        font-size: 70pt;
-        margin-bottom: 20px;
-      }
-      .total-tips {
-        font-size: 60pt;
-        color: #ff66ff;
-        border: 5px solid #ff66ff;
-        padding: 20px;
-        margin-bottom: 20px;
-      }
-      .footer {
-        font-size: 20pt;
-        text-align: center;
-      }
-    `;
+    const dynamicImageUrl = `${NEXT_PUBLIC_URL}/api/frame/generate-image?username=${username}&totalTips=${totalTips}`;
 
     // Move to the results page
     return new NextResponse(
@@ -130,7 +96,7 @@ async function handleInitialRequest(body: any): Promise<NextResponse> {
           },
         ],
         image: {
-          src: `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><foreignObject width='100%' height='100%'><style>${cssContent}</style><body xmlns='http://www.w3.org/1999/xhtml'>${htmlContent}</body></foreignObject></svg>`,
+          src: dynamicImageUrl,
           aspectRatio: '1:1',
         },
         postUrl: `${NEXT_PUBLIC_URL}/api/frame`,

@@ -33,6 +33,7 @@ export async function generateImage(username: string, totalTips: number): Promis
   context.font = '20pt Menlo';
   context.fillText(`frame by @cmplx.eth`, canvas.width / 2, 500);
 
+  console.log('Image generated successfully');
   return canvas.toBuffer('image/png');
 }
 
@@ -41,6 +42,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const username = url.searchParams.get('username') || 'unknown';
   const totalTips = parseInt(url.searchParams.get('totalTips') || '0', 10);
 
+  console.log(`Generating image for username: ${username}, totalTips: ${totalTips}`);
   const imageBuffer = await generateImage(username, totalTips);
 
   return new NextResponse(imageBuffer, {
