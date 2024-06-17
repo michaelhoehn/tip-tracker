@@ -1,6 +1,7 @@
 import { FrameRequest, getFrameMessage, getFrameHtmlResponse } from '@coinbase/onchainkit/frame';
 import { NextRequest, NextResponse } from 'next/server';
 import { NEXT_PUBLIC_URL } from '../../config';
+import { showTips } from './show-tips';
 
 const duneApiKey: string = process.env.DUNE_API_KEY!;
 const neynarApiKey: string = process.env.NEXT_PUBLIC_NEYNAR_API_KEY!;
@@ -12,7 +13,7 @@ if (!neynarApiKey) {
   throw new Error('NEXT_PUBLIC_NEYNAR_API_KEY is not defined in environment variables');
 }
 
-async function getResponse(body: FrameRequest): Promise<NextResponse> {
+async function handleInitialRequest(body: any): Promise<NextResponse> {
   try {
     console.log('Received body:', body);
 
@@ -28,7 +29,6 @@ async function getResponse(body: FrameRequest): Promise<NextResponse> {
       return new NextResponse('Message not valid', { status: 500 });
     }
 
-    // const fid = message.interactor.fid;
     const fid = 253746; // Hardcoded for debugging
     console.log('FID:', fid);
 
@@ -91,7 +91,63 @@ async function getResponse(body: FrameRequest): Promise<NextResponse> {
       return new NextResponse('Failed to execute query', { status: 500 });
     }
 
-    // Move to the final state with updated image and button
+    // Move to the second state with the "Count my tips" button
+    return new NextResponse(
+      getFrameHtmlResponse({
+        buttons: [
+          {
+            action: 'post',
+            label: 'Count my tips',
+            target: `${NEXT_PUBLIC_URL}/api/frame/show-tips`, // Update target to correct path
+          },
+          {
+            action: 'link',
+            label: 'Tip cmplx',
+            target: 'https://warpcast.com/cmplx.eth',
+          },
+        ],
+        image: {
+          src: `${NEXT_PUBLIC_URL}/park-1.png`,
+          aspectRatio: '1:1',
+        },
+        postUrl: `${NEXT_PUBLIC_URL}/api/frame`,
+        state: { executionId: userExecutionID }, // Pass the executionId in the state
+      }),
+    );
+  } catch (error) {
+    console.error('Error processing request:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
+}
+
+async function handleCountTipsRequest(executionId: string): Promise<NextResponse> {
+  try {
+    console.log('handleCountTipsRequest called with executionId:', executionId);
+
+    if (!executionId) {
+      return new NextResponse('Execution ID is missing', { status: 400 });
+    }
+
+    const resultsHeaders: HeadersInit = new Headers();
+    resultsHeaders.set('X-Dune-API-Key', duneApiKey);
+
+    const resultsResponse = await fetch(
+      `https://api.dune.com/api/v1/query/3824077/results?execution_id=${executionId}&limit=1000`,
+      {
+        method: 'GET',
+        headers: resultsHeaders,
+      },
+    );
+
+    console.log('Dune results response status:', resultsResponse.status);
+
+    const resultsData = await resultsResponse.json();
+    console.log('Dune Query Results:', resultsData);
+
+    const totalTips = resultsData.result?.rows?.[0]?.total_tips;
+    console.log('Total Tips:', totalTips);
+
+    // Return the response with the same page updated with the results
     return new NextResponse(
       getFrameHtmlResponse({
         buttons: [
@@ -105,23 +161,31 @@ async function getResponse(body: FrameRequest): Promise<NextResponse> {
           src: `${NEXT_PUBLIC_URL}/park-1.png`,
           aspectRatio: '1:1',
         },
-        postUrl: `${NEXT_PUBLIC_URL}/api/frame`,
+        state: { totalTips }, // Pass the total tips to the same page
       }),
     );
   } catch (error) {
-    console.error('Error processing request:', error);
+    console.error('Error fetching results:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
-// Handling POST request to initiate the process
+// Handling POST request to initiate the process and to count tips
 export async function POST(req: NextRequest): Promise<Response> {
   try {
     console.log('POST request received');
     const body = await req.json();
     console.log('POST request body:', body);
 
-    return getResponse(body); // Directly handle the initial request and move to the final state
+    const serializedState = body.untrustedData?.state || body.mockFrameData?.state?.serialized;
+    if (serializedState) {
+      const state = JSON.parse(serializedState);
+      console.log('Executing showTips with state:', state);
+      return handleCountTipsRequest(state.executionId); // Execute showTips if executionId is present
+    }
+
+    console.log('No executionId found in state, executing handleInitialRequest');
+    return handleInitialRequest(body); // Handle the initial request
   } catch (error) {
     console.error('Error in POST request:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
